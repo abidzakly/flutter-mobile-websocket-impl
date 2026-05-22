@@ -1,53 +1,64 @@
 // lib/data/repositories/socket_repository_impl.dart
 //
-// ─────────────────────────────────────────────────────────────────────────────
-// DATA LAYER — Repository Implementation
-// ─────────────────────────────────────────────────────────────────────────────
+// Two concrete implementations of SocketRepository:
+//   - WebSocketRepositoryImpl  → delegates to WebSocketDataSourceImpl
+//   - TcpSocketRepositoryImpl  → delegates to RawSocketDataSourceImpl
 //
-// Implementasi konkret dari interface SocketRepository (domain layer).
-// Menjadi jembatan antara domain dan datasource.
-//
-// Tugas utama:
-//   1. Delegasi operasi ke datasource
-//   2. Konversi model ↔ entity (mapping layer)
-//   3. Error handling / transformasi exception
+// BLoC and use cases only depend on SocketRepository (the interface),
+// so they work identically regardless of which impl is injected.
 
 import '../../domain/entities/socket_message.dart';
 import '../../domain/repositories/socket_repository.dart';
 import '../datasources/websocket_datasource.dart';
+import '../datasources/raw_socket_datasource.dart';
 import '../models/socket_message_model.dart';
 
-class SocketRepositoryImpl implements SocketRepository {
+// ─── WebSocket Repository ─────────────────────────────────────────────────────
+class WebSocketRepositoryImpl implements SocketRepository {
   final WebSocketDataSource _dataSource;
+  const WebSocketRepositoryImpl(this._dataSource);
 
-  const SocketRepositoryImpl(this._dataSource);
-
-  @override
-  Future<void> connect(String token) => _dataSource.connect(token);
-
-  @override
-  Future<void> disconnect() => _dataSource.disconnect();
+  @override Future<void> connect(String token) => _dataSource.connect(token);
+  @override Future<void> disconnect()           => _dataSource.disconnect();
+  @override Stream<ConnectionStatus> get connectionStatus => _dataSource.connectionStatus;
+  @override Stream<SocketMessage>    get incomingMessages => _dataSource.incomingMessages;
 
   @override
-  Stream<ConnectionStatus> get connectionStatus => _dataSource.connectionStatus;
-
-  /// Stream pesan masuk — konversi SocketMessageModel ke SocketMessage (entity)
-  @override
-  Stream<SocketMessage> get incomingMessages => _dataSource.incomingMessages;
-
-  @override
-  Future<void> send(SocketMessage message) {
-    final model = SocketMessageModel.fromEntity(message);
-    return _dataSource.send(model);
-  }
+  Future<void> send(SocketMessage message) =>
+      _dataSource.send(SocketMessageModel.fromEntity(message));
 
   @override
   Future<SocketMessage> sendWithAck(
-      SocketMessage message, {
-        Duration timeout = const Duration(seconds: 10),
-      }) async {
-    final model = SocketMessageModel.fromEntity(message);
-    // Kembalikan langsung — SocketMessageModel extends SocketMessage
-    return _dataSource.sendWithAck(model, timeout: timeout);
-  }
+    SocketMessage message, {
+    Duration timeout = const Duration(seconds: 10),
+  }) =>
+      _dataSource.sendWithAck(
+        SocketMessageModel.fromEntity(message),
+        timeout: timeout,
+      );
+}
+
+// ─── Raw TCP Socket Repository ────────────────────────────────────────────────
+class TcpSocketRepositoryImpl implements SocketRepository {
+  final RawSocketDataSource _dataSource;
+  const TcpSocketRepositoryImpl(this._dataSource);
+
+  @override Future<void> connect(String token) => _dataSource.connect(token);
+  @override Future<void> disconnect()           => _dataSource.disconnect();
+  @override Stream<ConnectionStatus> get connectionStatus => _dataSource.connectionStatus;
+  @override Stream<SocketMessage>    get incomingMessages => _dataSource.incomingMessages;
+
+  @override
+  Future<void> send(SocketMessage message) =>
+      _dataSource.send(SocketMessageModel.fromEntity(message));
+
+  @override
+  Future<SocketMessage> sendWithAck(
+    SocketMessage message, {
+    Duration timeout = const Duration(seconds: 10),
+  }) =>
+      _dataSource.sendWithAck(
+        SocketMessageModel.fromEntity(message),
+        timeout: timeout,
+      );
 }

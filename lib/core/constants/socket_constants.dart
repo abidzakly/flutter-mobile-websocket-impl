@@ -1,32 +1,42 @@
 // lib/core/constants/socket_constants.dart
-//
-// Semua konstanta yang digunakan di seluruh aplikasi.
-// Sentralisasi di sini agar mudah diubah.
 
 class SocketConstants {
-  SocketConstants._(); // Prevent instantiation
+  SocketConstants._();
 
-  // ─── Server URL ─────────────────────────────────────────────────────────────
-  // Development: ws:// (tidak terenkripsi, hanya untuk lokal)
-  // Production:  wss:// (TLS, WAJIB)
-  static const serverUrl = 'wss://trivial-return-planner.ngrok-free.dev';
-  // static const serverUrl = 'wss://your-production-server.com';
+  // ─── WebSocket Server ─────────────────────────────────────────────────────
+  // Development: ws://  |  Production: wss://
+  static const wsServerUrl = 'ws://10.10.4.160:8080';
+  // static const wsServerUrl = 'wss://your-ngrok-subdomain.ngrok-free.app';
 
-  // ─── Timeouts ────────────────────────────────────────────────────────────────
+  // ─── Raw TCP Socket Server ────────────────────────────────────────────────
+  static const tcpServerHost = '10.10.4.160';
+  static const tcpServerPort = 9000;
+  // For ngrok TCP tunnel: tcpServerHost = '0.tcp.ngrok.io', tcpServerPort = <assigned>
+
+  // ─── Framing Protokol (Raw TCP only) ─────────────────────────────────────
+  static const headerSize      = 4;           // 4-byte UINT32 BE length prefix
+  static const maxPayloadBytes = 1024 * 1024; // 1 MB max
+
+  // ─── Timeouts (shared) ───────────────────────────────────────────────────
   static const connectionTimeout        = Duration(seconds: 15);
   static const connectionTimeoutSeconds = 15;
   static const ackTimeout               = Duration(seconds: 10);
+  static const authTimeout              = Duration(seconds: 10);
 
-  // ─── Reconnect ───────────────────────────────────────────────────────────────
-  static const maxReconnectAttempts     = 5;
-  static const reconnectBaseDelaySeconds = 1;   // Base delay: 1 detik
-  static const maxReconnectDelaySeconds  = 30;  // Max delay: 30 detik
+  // ─── Reconnect (shared) ──────────────────────────────────────────────────
+  static const maxReconnectAttempts      = 5;
+  static const reconnectBaseDelaySeconds = 1;
+  static const maxReconnectDelaySeconds  = 30;
 
-  // ─── Client Metadata ─────────────────────────────────────────────────────────
+  // ─── Heartbeat ───────────────────────────────────────────────────────────
+  static const clientHeartbeatInterval = Duration(seconds: 25);
+
+  // ─── Client Metadata ─────────────────────────────────────────────────────
   static const clientVersion = '1.0.0';
 
-  // ─── Demo Token ──────────────────────────────────────────────────────────────
-  // HANYA UNTUK DEMO — di production ambil dari auth service / secure storage
-  // Token ini harus di-generate oleh server dengan JWT_SECRET yang sesuai
-  static const demoJwtToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ1c2VyXzEyMyIsImlhdCI6MTc3OTM3MDI4MiwiZXhwIjoxODEwOTA2MjgyfQ.VSPn6LHMUUZsAmuAiryfYy0y7NQMfAl_5Ddo840N0Us';
+  // ─── Demo Token ──────────────────────────────────────────────────────────
+  static const demoJwtToken =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9'
+      '.eyJ1c2VySWQiOiJ1c2VyXzEyMyIsImlhdCI6MTc3OTM3MDI4MiwiZXhwIjoxODEwOTA2MjgyfQ'
+      '.VSPn6LHMUUZsAmuAiryfYy0y7NQMfAl_5Ddo840N0Us';
 }

@@ -1,13 +1,8 @@
 // lib/core/utils/logger.dart
-//
-// Simple logger wrapper. Di production, ganti dengan package seperti
-// `logger` atau `talker` untuk output yang lebih kaya (file, remote, dsb).
 
 import 'package:flutter/foundation.dart';
 
 class AppLogger {
-  AppLogger._();
-
   static void debug(String msg) {
     if (kDebugMode) debugPrint('[DEBUG] $msg');
   }

@@ -1,47 +1,28 @@
 // lib/main.dart
-//
-// Entry point aplikasi Flutter.
-// Urutan inisialisasi:
-//   1. Pastikan Flutter binding siap
-//   2. Setup Dependency Injection
-//   3. runApp
 
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:requests_inspector/requests_inspector.dart';
-
 import 'core/di/injection.dart';
-import 'presentation/bloc/socket_bloc.dart';
-import 'presentation/pages/socket_page.dart';
+import 'presentation/pages/home_page.dart';
 
-Future<void> main() async {
-  // Wajib sebelum memanggil async code di main
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Daftarkan semua dependency
   await configureDependencies();
-
-  runApp(const RequestsInspector(child: SocketDemoApp()));
+  runApp(const MyApp());
 }
 
-class SocketDemoApp extends StatelessWidget {
-  const SocketDemoApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'WebSocket BLoC Demo',
+      title: 'Socket Demo',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorSchemeSeed: Colors.blue,
+        colorSchemeSeed: Colors.indigo,
         useMaterial3: true,
       ),
-      home: BlocProvider(
-        // BLoC disediakan di root widget agar dapat diakses
-        // oleh seluruh subtree SocketPage
-        create: (_) => sl<SocketBloc>(),
-        child: const SocketPage(),
-      ),
+      home: const HomePage(),
     );
   }
 }

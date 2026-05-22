@@ -4,80 +4,85 @@
 // DOMAIN LAYER — Entities
 // ─────────────────────────────────────────────────────────────────────────────
 //
-// Entity adalah objek murni domain bisnis. Tidak bergantung pada
-// framework, library, atau detail implementasi apapun.
-//
-// SocketMessage merepresentasikan satu unit komunikasi antara
-// client dan server melalui WebSocket channel.
-//
-// Arsitektur mengikuti Clean Architecture:
-//   Presentation → Domain ← Data
-//                     ↑
-//                  (entity ini)
+// Perbedaan dari versi WebSocket:
+// - Tambah MessageType.auth (client kirim token untuk autentikasi)
+// - Tambah MessageType.ping / pong (heartbeat di level aplikasi, bukan protokol)
+// - Tidak ada HTTP Upgrade — autentikasi dilakukan via pesan AUTH setelah connect
 
 import 'package:equatable/equatable.dart';
 
-/// Tipe pesan yang dikenali oleh sistem.
 enum MessageType {
-  /// Pesan dari client ke server berisi command code
+  /// Client → Server: autentikasi dengan JWT token
+  auth,
+
+  /// Client → Server: command code untuk meminta data
   command,
 
-  /// Respons data dari server
+  /// Server → Client: respons data sesuai command
   dataResponse,
 
-  /// Konfirmasi koneksi berhasil dari server
+  /// Server → Client: konfirmasi auth dan koneksi berhasil
   connectionAck,
 
-  /// Pesan error dari server
+  /// Error dari server atau client
   error,
 
-  /// Ping/pong heartbeat (internal, tidak ditampilkan ke UI)
-  heartbeat,
+  /// Heartbeat ping (client atau server bisa mengirim)
+  ping,
 
-  /// Tipe tidak dikenal — untuk forward-compatibility
+  /// Heartbeat pong (balasan ping)
+  pong,
+
+  /// Tipe tidak dikenal — forward-compatibility
   unknown,
 }
 
-/// [SocketMessage] — entity utama komunikasi WebSocket.
+/// [SocketMessage] — entity utama komunikasi Raw TCP Socket.
 ///
-/// Immutable: semua field final, gunakan [copyWith] untuk membuat
-/// instance baru dengan perubahan parsial.
+/// Immutable. Gunakan [copyWith] atau factory constructors untuk
+/// membuat instance baru dengan perubahan parsial.
 class SocketMessage extends Equatable {
-  /// ID unik per pesan — digunakan untuk mencocokkan request-response.
-  /// Format: UUID v4 string.
   final String requestId;
-
-  /// Tipe pesan (lihat enum [MessageType]).
   final MessageType type;
 
-  /// Command code yang dikirim client ke server.
-  /// Contoh: "001", "011", "111"
-  /// Null jika ini adalah pesan respons dari server.
+  /// JWT token — diisi hanya pada MessageType.auth
+  final String? token;
+
+  /// Command code — diisi pada MessageType.command (misal: "001", "011")
   final String? command;
 
-  /// Data payload dari respons server (sudah di-decode dari JSON).
+  /// Data payload dari respons server
   final Map<String, dynamic>? data;
 
-  /// Kode error jika type == MessageType.error
   final String? errorCode;
-
-  /// Pesan error yang dapat dibaca manusia
   final String? errorMessage;
-
-  /// Waktu pesan dibuat (epoch milliseconds)
   final int timestamp;
 
   const SocketMessage({
     required this.requestId,
     required this.type,
     required this.timestamp,
+    this.token,
     this.command,
     this.data,
     this.errorCode,
     this.errorMessage,
   });
 
-  /// Factory: buat pesan command dari client ke server
+  /// Buat pesan AUTH untuk dikirim pertama kali setelah TCP connect
+  factory SocketMessage.auth({
+    required String requestId,
+    required String token,
+  }) {
+    return SocketMessage(
+      requestId: requestId,
+      type: MessageType.auth,
+      token: token,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  /// Buat pesan COMMAND
   factory SocketMessage.command({
     required String requestId,
     required String command,
@@ -92,10 +97,19 @@ class SocketMessage extends Equatable {
     );
   }
 
-  /// Buat salinan dengan beberapa field diubah (immutable update pattern)
+  /// Buat pesan PING (heartbeat dari client)
+  factory SocketMessage.ping({required String requestId}) {
+    return SocketMessage(
+      requestId: requestId,
+      type: MessageType.ping,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
   SocketMessage copyWith({
     String? requestId,
     MessageType? type,
+    String? token,
     String? command,
     Map<String, dynamic>? data,
     String? errorCode,
@@ -105,6 +119,7 @@ class SocketMessage extends Equatable {
     return SocketMessage(
       requestId:    requestId    ?? this.requestId,
       type:         type         ?? this.type,
+      token:        token        ?? this.token,
       command:      command      ?? this.command,
       data:         data         ?? this.data,
       errorCode:    errorCode    ?? this.errorCode,
@@ -115,12 +130,6 @@ class SocketMessage extends Equatable {
 
   @override
   List<Object?> get props => [
-    requestId,
-    type,
-    command,
-    data,
-    errorCode,
-    errorMessage,
-    timestamp,
+    requestId, type, token, command, data, errorCode, errorMessage, timestamp,
   ];
 }

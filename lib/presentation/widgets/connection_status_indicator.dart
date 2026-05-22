@@ -1,120 +1,71 @@
 // lib/presentation/widgets/connection_status_indicator.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
 import '../../domain/repositories/socket_repository.dart';
+import '../bloc/socket_bloc.dart';
+import '../bloc/socket_state.dart';
 
-/// Widget yang menampilkan status koneksi secara visual.
-/// Mendukung mode compact (untuk AppBar) dan mode penuh.
 class ConnectionStatusIndicator extends StatelessWidget {
-  final ConnectionStatus status;
-  final int reconnectAttempts;
-  final bool compact;
-
-  const ConnectionStatusIndicator({
-    super.key,
-    required this.status,
-    this.reconnectAttempts = 0,
-    this.compact = false,
-  });
+  final Color accentColor;
+  const ConnectionStatusIndicator({super.key, required this.accentColor});
 
   @override
   Widget build(BuildContext context) {
-    final info = _statusInfo(status);
-
-    if (compact) {
-      // Mode compact: hanya dot berwarna (untuk AppBar)
-      return Tooltip(
-        message: info.label,
-        child: Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: info.color,
-            shape: BoxShape.circle,
+    return BlocBuilder<SocketBloc, SocketState>(
+      buildWhen: (p, c) =>
+          p.connectionStatus  != c.connectionStatus ||
+          p.reconnectAttempts != c.reconnectAttempts,
+      builder: (context, state) {
+        final (color, icon, label) = _statusDisplay(state, accentColor);
+        return Container(
+          color: color.withOpacity(0.10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              Icon(icon, color: color, size: 16),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color, fontWeight: FontWeight.w600, fontSize: 12,
+                ),
+              ),
+              if (state.isConnecting || state.isReconnecting) ...[
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 12, height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: color),
+                ),
+              ],
+            ],
           ),
-        ),
-      );
-    }
-
-    // Mode penuh: icon + label + reconnect counter
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // Animasi pulsing saat connecting/reconnecting
-        if (status == ConnectionStatus.connecting ||
-            status == ConnectionStatus.reconnecting)
-          _PulsingDot(color: info.color)
-        else
-          Icon(info.icon, color: info.color, size: 20),
-        const SizedBox(width: 8),
-        Text(
-          reconnectAttempts > 0 && status == ConnectionStatus.reconnecting
-              ? '${info.label} (attempt $reconnectAttempts)'
-              : info.label,
-          style: TextStyle(color: info.color, fontWeight: FontWeight.w600),
-        ),
-      ],
+        );
+      },
     );
   }
 
-  _StatusInfo _statusInfo(ConnectionStatus s) {
-    switch (s) {
-      case ConnectionStatus.idle:
-        return _StatusInfo('Not Connected', Colors.grey, Icons.circle_outlined);
-      case ConnectionStatus.connecting:
-        return _StatusInfo('Connecting...', Colors.orange, Icons.sync);
+  (Color, IconData, String) _statusDisplay(SocketState state, Color accent) {
+    switch (state.connectionStatus) {
       case ConnectionStatus.connected:
-        return _StatusInfo('Connected', Colors.green, Icons.check_circle);
-      case ConnectionStatus.disconnected:
-        return _StatusInfo('Disconnected', Colors.red, Icons.cancel);
+        return (accent, Icons.wifi, 'Connected');
+      case ConnectionStatus.connecting:
+        return (Colors.orange, Icons.wifi_find, 'Connecting...');
+      case ConnectionStatus.authenticating:
+        return (Colors.orange, Icons.lock_clock, 'Authenticating...');
       case ConnectionStatus.reconnecting:
-        return _StatusInfo('Reconnecting...', Colors.orange, Icons.sync);
+        return (
+          Colors.orange,
+          Icons.wifi_protected_setup,
+          'Reconnecting... (attempt ${state.reconnectAttempts})',
+        );
+      case ConnectionStatus.disconnected:
+        return (Colors.grey, Icons.wifi_off, 'Disconnected');
       case ConnectionStatus.error:
-        return _StatusInfo('Connection Error', Colors.red, Icons.error);
+        return (Colors.red, Icons.error_outline, 'Connection Error');
+      case ConnectionStatus.idle:
+        return (Colors.grey, Icons.wifi_off, 'Tap Connect to start');
     }
   }
-}
-
-class _StatusInfo {
-  final String label;
-  final Color color;
-  final IconData icon;
-  const _StatusInfo(this.label, this.color, this.icon);
-}
-
-/// Animasi dot pulsing untuk state connecting
-class _PulsingDot extends StatefulWidget {
-  final Color color;
-  const _PulsingDot({required this.color});
-
-  @override
-  State<_PulsingDot> createState() => _PulsingDotState();
-}
-
-class _PulsingDotState extends State<_PulsingDot>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  late Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    )..repeat(reverse: true);
-    _anim = Tween<double>(begin: 0.4, end: 1.0).animate(_ctrl);
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => FadeTransition(
-    opacity: _anim,
-    child: Icon(Icons.circle, color: widget.color, size: 14),
-  );
 }

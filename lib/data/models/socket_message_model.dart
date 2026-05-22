@@ -1,84 +1,80 @@
 // lib/data/models/socket_message_model.dart
 //
 // ─────────────────────────────────────────────────────────────────────────────
-// DATA LAYER — Model (DTO)
+// DATA LAYER — Model (DTO) — shared by both WebSocket & Raw TCP datasources
 // ─────────────────────────────────────────────────────────────────────────────
 //
-// Model adalah Data Transfer Object (DTO) — bertanggung jawab untuk
-// serialisasi/deserialisasi JSON dari/ke network.
+// JSON format differences:
 //
-// Model extends Entity sehingga dapat langsung digunakan di domain.
-// Alternatif: pisahkan sepenuhnya dan gunakan mapper — tergantung preferensi tim.
+// WebSocket (toJsonWs):
+//   Client → Server: { "requestId", "command", "payload"? }
+//   No "type" field — server routes by message content
+//
+// Raw TCP (toJson):
+//   Client → Server: { "type", "requestId", "timestamp", "token"?, "command"?, "payload"? }
+//   "type" field required — server uses it to route since TCP has no opcodes
+//
+// fromJson() is shared — server always sends "type" in responses for both protocols.
 
-import '../../domain/entities/socket_message.dart';
 import '../../domain/entities/data_item.dart';
+import '../../domain/entities/socket_message.dart';
 
-/// [SocketMessageModel] — DTO untuk parsing JSON dari/ke WebSocket.
-///
-/// Semua JSON dari/ke server harus melalui class ini.
 class SocketMessageModel extends SocketMessage {
   const SocketMessageModel({
     required super.requestId,
     required super.type,
     required super.timestamp,
+    super.token,
     super.command,
     super.data,
     super.errorCode,
     super.errorMessage,
   });
 
-  // ─── Serialisasi: Entity → JSON (untuk dikirim ke server) ──────────────────
-
-  /// Konversi ke Map yang siap di-encode menjadi JSON string.
-  ///
-  /// Format yang dikirim ke server:
-  /// ```json
-  /// {
-  ///   "requestId": "550e8400-...",
-  ///   "command":   "001",
-  ///   "payload":   {}
-  /// }
-  /// ```
-  Map<String, dynamic> toJson() {
+  // ─── WebSocket format: client → server ────────────────────────────────────
+  // Minimal payload — server infers type from presence of "command" field.
+  // Auth is done via URL query param, so no AUTH message needed here.
+  Map<String, dynamic> toJsonWs() {
     return {
       'requestId': requestId,
-      'command':   command,
-      // "payload" diisi dari field "data" pada entity command
-      if (data != null) 'payload': data,
+      if (command != null) 'command': command,
+      if (data    != null) 'payload': data,
     };
   }
 
-  // ─── Deserialisasi: JSON → Model (untuk diterima dari server) ──────────────
+  // ─── Raw TCP format: client → server ──────────────────────────────────────
+  // Explicit "type" required — TCP has no WebSocket opcodes for routing.
+  Map<String, dynamic> toJson() {
+    return {
+      'type':      _typeToString(type),
+      'requestId': requestId,
+      'timestamp': timestamp,
+      if (token   != null) 'token':   token,
+      if (command != null) 'command': command,
+      if (data    != null) 'payload': data,
+    };
+  }
 
-  /// Parse JSON dari server menjadi [SocketMessageModel].
-  ///
-  /// Format yang diterima dari server:
-  /// ```json
-  /// {
-  ///   "type":      "DATA_RESPONSE",
-  ///   "requestId": "550e8400-...",
-  ///   "command":   "001",
-  ///   "data":      { "items": [...], "matched": [...] },
-  ///   "timestamp": 1234567890
-  /// }
-  /// ```
+  // ─── Shared: server → client (both protocols respond with "type") ──────────
   factory SocketMessageModel.fromJson(Map<String, dynamic> json) {
     return SocketMessageModel(
-      requestId:    json['requestId'] as String? ?? '',
-      type:         _parseMessageType(json['type'] as String? ?? ''),
-      command:      json['command']      as String?,
-      data:         json['data']         as Map<String, dynamic>?,
-      errorCode:    json['code']         as String?,
-      errorMessage: json['message']      as String?,
-      timestamp:    json['timestamp']    as int? ?? DateTime.now().millisecondsSinceEpoch,
+      requestId:    json['requestId']  as String? ?? '',
+      type:         _parseType(json['type'] as String? ?? ''),
+      token:        json['token']      as String?,
+      command:      json['command']    as String?,
+      data:         json['data']       as Map<String, dynamic>?,
+      errorCode:    json['code']       as String?,
+      errorMessage: json['message']    as String?,
+      timestamp:    json['timestamp']  as int?
+                    ?? DateTime.now().millisecondsSinceEpoch,
     );
   }
 
-  /// Konversi dari domain entity [SocketMessage] ke model.
   factory SocketMessageModel.fromEntity(SocketMessage entity) {
     return SocketMessageModel(
       requestId:    entity.requestId,
       type:         entity.type,
+      token:        entity.token,
       command:      entity.command,
       data:         entity.data,
       errorCode:    entity.errorCode,
@@ -87,36 +83,53 @@ class SocketMessageModel extends SocketMessage {
     );
   }
 
-  // ─── Helper: parse string type dari server ke enum ─────────────────────────
-  static MessageType _parseMessageType(String typeStr) {
+  static String _typeToString(MessageType type) {
+    switch (type) {
+      case MessageType.auth:          return 'AUTH';
+      case MessageType.command:       return 'COMMAND';
+      case MessageType.dataResponse:  return 'DATA_RESPONSE';
+      case MessageType.connectionAck: return 'CONNECTION_ACK';
+      case MessageType.error:         return 'ERROR';
+      case MessageType.ping:          return 'PING';
+      case MessageType.pong:          return 'PONG';
+      case MessageType.unknown:       return 'UNKNOWN';
+    }
+  }
+
+  static MessageType _parseType(String typeStr) {
     switch (typeStr) {
-      case 'DATA_RESPONSE':    return MessageType.dataResponse;
-      case 'CONNECTION_ACK':   return MessageType.connectionAck;
-      case 'ERROR':            return MessageType.error;
-      default:                 return MessageType.unknown;
+      case 'AUTH':           return MessageType.auth;
+      case 'COMMAND':        return MessageType.command;
+      case 'DATA_RESPONSE':  return MessageType.dataResponse;
+      case 'CONNECTION_ACK': return MessageType.connectionAck;
+      case 'ERROR':          return MessageType.error;
+      case 'PING':           return MessageType.ping;
+      case 'PONG':           return MessageType.pong;
+      default:               return MessageType.unknown;
     }
   }
 }
 
-/// [DataItemModel] — DTO untuk item data dalam respons server.
+// ─── DataItemModel ────────────────────────────────────────────────────────────
 class DataItemModel extends DataItem {
   const DataItemModel({
     required super.id,
     required super.name,
     required super.value,
     required super.category,
+    super.description,
   });
 
   factory DataItemModel.fromJson(Map<String, dynamic> json) {
     return DataItemModel(
-      id:       json['id']       as String,
-      name:     json['name']     as String,
-      value:    json['value']    as int,
-      category: json['category'] as String,
+      id:          json['id']          as String,
+      name:        json['name']        as String,
+      value:       json['value']       as int,
+      category:    json['category']    as String,
+      description: json['description'] as String?,
     );
   }
 
-  /// Parse list dari JSON array
   static List<DataItemModel> listFromJson(List<dynamic> jsonList) {
     return jsonList
         .map((item) => DataItemModel.fromJson(item as Map<String, dynamic>))

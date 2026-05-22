@@ -1,69 +1,64 @@
 // lib/presentation/widgets/data_items_list.dart
-//
-// Menampilkan list DataItem yang diterima dari server sebagai respons command.
-//
-// Widget ini di-rebuild otomatis oleh BlocBuilder setiap kali
-// state.receivedItems berubah — memenuhi acceptance criteria:
-// "Update data lokal dari client setelah menerima data dari server"
 
 import 'package:flutter/material.dart';
-import '../../domain/entities/data_item.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../bloc/socket_bloc.dart';
+import '../bloc/socket_state.dart';
 
 class DataItemsList extends StatelessWidget {
-  final List<DataItem> items;
-
-  const DataItemsList({super.key, required this.items});
+  const DataItemsList({super.key});
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 16),
-          child: Text(
-            'No data received yet.\nSend a command to fetch data.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey),
-          ),
-        ),
-      );
-    }
+    return BlocBuilder<SocketBloc, SocketState>(
+      buildWhen: (p, c) => p.receivedItems != c.receivedItems,
+      builder: (context, state) {
+        if (state.receivedItems.isEmpty) {
+          return const Center(
+            child: Text(
+              'No data yet.\nSend a command to receive data from server.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey),
+            ),
+          );
+        }
 
-    return Column(
-      children: items.map((item) => _DataItemCard(item: item)).toList(),
-    );
-  }
-}
-
-// ─── Card untuk satu DataItem ─────────────────────────────────────────────────
-class _DataItemCard extends StatelessWidget {
-  final DataItem item;
-  const _DataItemCard({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      color: Theme.of(context).colorScheme.surfaceVariant,
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          foregroundColor: Theme.of(context).colorScheme.onPrimary,
-          child: Text(
-            item.id,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
-        title: Text(
-          item.name,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Text('Category: ${item.category}'),
-        trailing: Chip(
-          label: Text('${item.value}'),
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        ),
-      ),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Text(
+                'Received Data (${state.receivedItems.length} items)',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: state.receivedItems.length,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                itemBuilder: (context, index) {
+                  final item = state.receivedItems[index];
+                  return Card(
+                    child: ListTile(
+                      leading: CircleAvatar(child: Text(item.id)),
+                      title: Text(item.name),
+                      subtitle: Text(
+                        item.description ?? item.category,
+                      ),
+                      trailing: Chip(
+                        label: Text('${item.value}'),
+                        padding: EdgeInsets.zero,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

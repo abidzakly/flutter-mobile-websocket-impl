@@ -1,5 +1,5 @@
 name: socket_demo
-description: Production-ready WebSocket client with BLoC state management.
+description: Production-ready Raw TCP Socket client with BLoC state management.
 version: 1.0.0+1
 
 environment:
@@ -9,76 +9,35 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # WebSocket — menggunakan dart:io WebSocket (raw socket di atas TCP)
-  # Tidak perlu package eksternal; dart:io sudah menyediakan WebSocket class
+  # Raw TCP Socket — menggunakan dart:io Socket
+  # (dart:io sudah built-in, tidak perlu package eksternal)
 
   # State Management
-  flutter_bloc: ^8.1.6       # BLoC pattern untuk state management
+  flutter_bloc: ^8.1.6
   bloc: ^8.1.4
 
-  # DI (Dependency Injection)
-  get_it: ^7.7.0             # Service locator
-
-  # Networking & Serialization
-  equatable: ^2.0.5          # Value equality untuk BLoC state/event
-  json_annotation: ^4.9.0   # Anotasi untuk JSON serialization
-
-  # Security
-  flutter_secure_storage: ^9.2.2  # Simpan token di Keychain/Keystore
-  crypto: ^3.0.3                  # HMAC/SHA untuk signing payload
+  # DI
+  get_it: ^7.7.0
 
   # Utilities
-  uuid: ^4.4.2               # Generate request ID
-  connectivity_plus: ^6.0.5  # Monitor koneksi jaringan
-  requests_inspector: ^4.0.4
+  equatable: ^2.0.5
+
+  # Security
+  flutter_secure_storage: ^9.2.2  # Simpan JWT token di Keychain/Keystore
+  crypto: ^3.0.3                  # HMAC-SHA256 payload signing
+
+  # ID generation
+  uuid: ^4.4.2
+
+  # Network monitoring
+  connectivity_plus: ^6.0.5
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   bloc_test: ^9.1.7
   mocktail: ^1.0.4
-  build_runner: ^2.4.11
-  json_serializable: ^6.8.0
   flutter_lints: ^4.0.0
 
-# For information on the generic Dart part of this file, see the
-# following page: https://dart.dev/tools/pub/pubspec
-
-# The following section is specific to Flutter packages.
 flutter:
-
-  # The following line ensures that the Material Icons font is
-  # included with your application, so that you can use the icons in
-  # the material Icons class.
   uses-material-design: true
-
-  # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
-
-  # An image asset can refer to one or more resolution-specific "variants", see
-  # https://flutter.dev/to/resolution-aware-images
-
-  # For details regarding adding assets from package dependencies, see
-  # https://flutter.dev/to/asset-from-package
-
-  # To add custom fonts to your application, add a fonts section here,
-  # in this "flutter" section. Each entry in this list should have a
-  # "family" key with the font family name, and a "fonts" key with a
-  # list giving the asset and other descriptors for the font. For
-  # example:
-  # fonts:
-  #   - family: Schyler
-  #     fonts:
-  #       - asset: fonts/Schyler-Regular.ttf
-  #       - asset: fonts/Schyler-Italic.ttf
-  #         style: italic
-  #   - family: Trajan Pro
-  #     fonts:
-  #       - asset: fonts/TrajanPro.ttf
-  #       - asset: fonts/TrajanPro_Bold.ttf
-  #         weight: 700
-  #
-  # For details regarding fonts from package dependencies,
-  # see https://flutter.dev/to/font-from-package
